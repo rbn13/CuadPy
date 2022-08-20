@@ -179,7 +179,22 @@ class Ui_CuadPy(object):
 
     def carpeta(self):
         import os
+        import platform
+        import subprocess
+        
+#Abrir carpeta en en windows        
         os.system(f'start {os.path.realpath("PDF_EDITADO")}')
+        
+#Abrir carpeta en funcion al sistema operatico que estemos usando
+        def open_file(path):
+            if platform.system() == "Windows":
+                os.startfile(path)
+            elif platform.system() == "Darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+
+        open_file("PDF_EDITADO")
 
 
     def mensaje(self):
