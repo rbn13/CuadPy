@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
-
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QPushButton, QMessageBox
+from PyPDF2 import PdfFileWriter, PdfFileReader, PdfFileMerger, PageObject
+import os
+import platform
+import subprocess
 
 class Ui_CuadPy(object):
     def setupUi(self, CuadPy):
@@ -36,35 +39,37 @@ class Ui_CuadPy(object):
 
 
 # AÑADO CONEXION A LAS FUNCIONES
-        self.btn1.clicked.connect(self.reorganiza)
-        self.btn_split.clicked.connect(self.mensaje)
+        self.btn1.clicked.connect(self.booklet)
+        self.btn_split.clicked.connect(self.dividir)
         self.btn_carpeta.clicked.connect(self.carpeta)
         self.info.clicked.connect(self.info_autor)
 
     def retranslateUi(self, CuadPy):
         _translate = QtCore.QCoreApplication.translate
         CuadPy.setWindowTitle(_translate("CuadPy", "CuadPy"))
-        self.caja.setText(_translate("CuadPy", "PDF Aqui")) #Documento cargado
+        self.caja.setText(_translate("CuadPy", "C:/Users/rromero/PycharmProjects/pdf_manager/ejemplo/pdfs/20p.pdf")) #Documento cargado
         self.label.setText(_translate("CuadPy", "Arrastra el pdf aquí"))
         self.btn1.setText(_translate("CuadPy", "Reordenar"))
         self.btn_split.setText(_translate("CuadPy", "Dividir PDF"))
         self.btn_carpeta.setText(_translate("CuadPy", "Abrir carpeta"))
         self.info.setText(_translate("CuadPy", "..."))
 
-#Funciones del boton
+# FUNCIONES DE LOS BOTONES
+
+    #Funcion que invoca la funcion de reorganizar pdf, poner dos hojas en una cara y borrar los pdfs que surgen del proceso
+    def booklet(self):
+        self.reorganiza()
+        self.dobles()
+        self.borrar_residuos()
+
+    #Organizar las paginas del pdf segun el orden surgido del algoritmo en una tupla
     def reorganiza(self):
-        from PyPDF2 import PdfFileWriter, PdfFileReader, PdfFileMerger
-        import os
 
-        ########################################
-        """CARGANDO EL PDF"""
-        ########################################
-
+        #Cargar pdf
         doc = self.caja.toPlainText()
         ruta_PDF = os.path.join(os.getcwd(), doc)  # ALternativa --> ruta_PDF = "ejemplo/sample.pdf"
         PDF = PdfFileReader(ruta_PDF)
         numPages = int(PDF.getNumPages())
-        # Ver numero de paginas del PDF --> print ("Tenemos %s paginas." % numPages)
 
         ########################################
         """RECUENTO DE PAGINAS y AJUSTE A MULTIPLOS DE 4"""
@@ -91,14 +96,17 @@ class Ui_CuadPy(object):
         """AÑADIENDO PAGINAS BLANCAS"""
         #############################
 
-        # PASO 1 Añadimos el PDF original y el PDF con paginas blancas
+        # PASO 1 Añadimos el PDF original y creamos las paginas blancas a añadir
         input_pdf = PDF
         output = PdfFileWriter()
-        blanc_pdf = PdfFileReader("blanc.pdf")
+        medida_hoja = input_pdf.getPage(0)  # Tomo la primera hoja del pdf para crear paginas blancas de la misma medida
 
-        # PASO 2 Obtenemos el numero de hojas blancas que queremos añadir
+        # PASO 2 Obtenemos el numero de hojas blancas que queremos añadir y creamos hojas blancas segun se necesitan
         for blancas in range(diferencia):
-            output.addPage(blanc_pdf.getPage(blancas))
+            largo = medida_hoja.mediaBox.getHeight()
+            ancho = medida_hoja.mediaBox.getWidth()
+            blanc_pdf = PageObject.createBlankPage(None, ancho, largo)  # Creamos pagina en blanco con las medidas del pdf original
+            output.addPage(blanc_pdf)
 
         with open(os.path.join("PDF_EDITADO", "residuo.pdf"), 'wb') as f:
             output.write(f)
@@ -177,15 +185,45 @@ class Ui_CuadPy(object):
         with open(os.path.join("PDF_EDITADO", "creado.pdf"), 'wb') as f:
             creacion.write(f)
 
+
+    def dobles(self): #CREAR UN BOOKLET CON LAS PAGINAS YA ORDENADAS
+
+        # Carga pdf y variables
+        doc= "PDF_EDITADO/creado.pdf"
+        pdf_elegido = os.path.join(os.getcwd(), doc)
+        reader = PdfFileReader(pdf_elegido)#(open(pdf_elegido, 'rb'))  # el primer pdf
+        sup_reader = reader  # el segundo pdf
+        numPags = int(reader.getNumPages()/2)
+        writer = PdfFileWriter()
+
+        # Bucle para crear paginas
+        for i in range(numPags):
+            invoice_page = reader.getPage(i * 2)  # Hoja que ira a la izquierda del folio
+            sup_page = sup_reader.getPage(int(i * 2) + 1)  # Hoja que ira a la derecha del folio
+
+            # Creamos pagina en blanco con las medidas del pdf original pero multiplico ancho x2 para que quede apaisada
+            largo = sup_page.mediaBox.getHeight()
+            ancho = sup_page.mediaBox.getWidth()
+            translated_page = PageObject.createBlankPage(None, ancho * 2, largo)
+
+            # Localizacion de las copias en cada lado
+            escala = 1  # Escala original
+            desp_horizonal = int(ancho)  # pongo el ancho porque asi es justo la mitad de la hoja creada
+            desp_vertical = 0
+            e, x, y = [escala, desp_horizonal,
+                       desp_vertical]  # Escala de la copia, colocacion en eje horizontal, colocacion eje vertical
+
+            translated_page.mergeScaledTranslatedPage(sup_page, e, x, y)
+            translated_page.mergePage(invoice_page)
+
+            # Escribiendo el pdf
+            writer.addPage(translated_page)
+
+        with open(os.path.join("PDF_EDITADO", "IMPRIMIBLE.pdf"), 'wb') as f:
+            writer.write(f)
+
     def carpeta(self):
-        import os
-        import platform
-        import subprocess
-        
-#Abrir carpeta en en windows        
-        os.system(f'start {os.path.realpath("PDF_EDITADO")}')
-        
-#Abrir carpeta en funcion al sistema operatico que estemos usando
+        # Abrir carpeta en funcion al sistema operatico que estemos usando
         def open_file(path):
             if platform.system() == "Windows":
                 os.startfile(path)
@@ -196,9 +234,33 @@ class Ui_CuadPy(object):
 
         open_file("PDF_EDITADO")
 
+    def dividir(self):
+        self.caja.setText("Dividido en pares e impares para imprimir por caras")
 
-    def mensaje(self):
-        self.caja.setText("FIN")
+        # Cargo el pdf con las paginas blancas y creo un doc para crear
+        xdividir = PdfFileReader("PDF_EDITADO/IMPRIMIBLE.pdf")
+        hojas_pares = PdfFileWriter()
+        hojas_impares = PdfFileWriter()
+        numPages = int(xdividir.getNumPages()/2)
+
+        #Creo un pdf con paginas pares
+        for i in range(numPages):
+            pares = xdividir.getPage(int(i*2)+1)
+            hojas_pares.addPage(pares)
+        with open(os.path.join("PDF_EDITADO", "1_Pares_carasB.pdf"), 'wb') as f:
+            hojas_pares.write(f)
+
+        # Creo un pdf con paginas impares
+        for i in range(numPages):
+            impares = xdividir.getPage(i*2)
+            hojas_impares.addPage(impares)
+        with open(os.path.join("PDF_EDITADO", "2_Impares_carasA.pdf"), 'wb') as f:
+            hojas_impares.write(f)
+
+    def borrar_residuos(self):
+        from os import remove
+        remove("PDF_EDITADO/residuo2.pdf")
+        remove("PDF_EDITADO/creado.pdf")
 
     def info_autor(self):
         msgBox = QMessageBox()
