@@ -1,5 +1,5 @@
 #!\usr\env\bin python
-from PyPDF2 import PdfFileWriter, PdfFileReader, PdfFileMerger
+from PyPDF2 import PdfFileWriter, PdfFileReader, PdfFileMerger, PageObject
 import os
 
 ########################################
@@ -38,14 +38,17 @@ diferencia = num-num_hojas
 """AÑADIENDO PAGINAS BLANCAS"""
 #############################
 
-#PASO 1 Añadimos el PDF original y el PDF con paginas blancas
+#PASO 1 Añadimos el PDF original y creamos las paginas blancas a añadir
 input_pdf = PDF
 output = PdfFileWriter()
-blanc_pdf = PdfFileReader("blanc.pdf")
+medida_hoja = input_pdf.getPage(0) #Tomo la primera hoja del pdf para crear paginas blancas de la misma medida
 
-#PASO 2 Obtenemos el numero de hojas blancas que queremos añadir
-for blancas in range (diferencia):
-    output.addPage(blanc_pdf.getPage(blancas))
+#PASO 2 Obtenemos el numero de hojas blancas que queremos añadir y creamos hojas blancas segun se necesitan
+for blancas in range(diferencia):
+    largo = medida_hoja.mediaBox.getHeight()
+    ancho = medida_hoja.mediaBox.getWidth()
+    blanc_pdf = PageObject.createBlankPage(None, ancho, largo) #Creamos pagina en blanco con las medidas del pdf original
+    output.addPage(blanc_pdf)
 
 with open(os.path.join("PDF_EDITADO", "residuo.pdf"), 'wb') as f:
     output.write(f)
