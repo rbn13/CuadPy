@@ -1,2 +1,2 @@
 # CuadPy
-Reorganiza PDF para crear cuadernos
+Reorganiza PDF para crear cuadernos (Booklets)
